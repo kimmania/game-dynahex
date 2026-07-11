@@ -258,6 +258,16 @@ html, body {
   margin-bottom: 4px;
 }
 
+.goal-objective {
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.obj-mark { color: var(--mark); font-weight: 600; }
+.obj-clear { color: var(--clear); font-weight: 600; }
+
 .goal-info {
   display: flex;
   gap: 6px;
@@ -503,6 +513,96 @@ html, body {
 .demo-stale { background: var(--mark-bg); border: 1px solid var(--mark); position: relative; }
 .demo-stale::after { content: ''; position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
+/* Help mini-boards and walkthrough */
+.help-intro {
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.help-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin: 12px 0;
+  padding: 10px;
+  background: var(--bg-panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.help-step-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  padding-top: 4px;
+}
+
+.mini-board {
+  display: grid;
+  flex-shrink: 0;
+  width: 180px;
+  height: 180px;
+  position: relative;
+}
+
+.mini-hex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  width: 52px;
+  height: 60px;
+  position: absolute;
+}
+
+.mini-hex.unknown { background: var(--hex-unknown); }
+.mini-hex.marked { background: var(--mark-bg); }
+.mini-hex.cleared { background: var(--clear-bg); }
+.mini-hex.clue { background: var(--clue-bg); color: var(--text); border: 1px solid var(--accent); }
+.mini-hex.clue::after {
+  clip-path: none;
+}
+
+.help-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.help-controls li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.demo-tool {
+  flex-shrink: 0;
+  min-width: 72px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: default;
+}
+
+.demo-tool.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .score-legend {
   display: flex;
   flex-direction: column;
@@ -517,12 +617,10 @@ html, body {
 }
 
 /* Settings */
-.settings-content {
-  display: flex;
+.settings-content {  display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .setting-row {
   display: flex;
   justify-content: space-between;

@@ -202,10 +202,11 @@ export class App {
     const driftLabel = level.driftVariant.charAt(0).toUpperCase() + level.driftVariant.slice(1);
     this.els['goal-banner'].innerHTML = `
       <div class="goal-title">${level.name}</div>
+      <div class="goal-objective">Mark every true hex <span class="obj-mark">orange</span> and clear every safe hex <span class="obj-clear">blue</span> — then survive a drift tick with no movement to win.</div>
       <div class="goal-info">
         <span class="goal-pill">${level.cells.length} cells</span>
         <span class="goal-pill">${driftLabel} drift (every ${level.driftFrequency} moves)</span>
-        <span class="goal-pill">${level.anchorBudget} anchors</span>
+        <span class="goal-pill">${level.anchorBudget - (this.state?.anchorsUsed ?? 0)} anchors left</span>
         ${level.lossTolerance > 0 ? `<span class="goal-pill warn">${level.lossTolerance} loss OK</span>` : '<span class="goal-pill warn">No losses</span>'}
       </div>
     `;
@@ -458,6 +459,9 @@ export class App {
     // Update undo button
     (this.els['undo-btn'] as HTMLElement).classList.toggle('disabled', this.history.length < 2);
 
+    // Update goal banner (anchor count changes)
+    this.renderGoalBanner();
+
     // Update renderer
     if (this.renderer) {
       this.renderer.setState(this.state);
@@ -506,7 +510,77 @@ export class App {
   // ============================================================
 
   private openHelp() {
+    this.renderHelpMiniBoards();
     this.els['help-modal'].style.display = 'flex';
+  }
+
+  private renderHelpMiniBoards() {
+    // Render two mini boards: before (all unknown + clue) and solved (2 marked, rest cleared)
+    // Layout: 7 hexes in a small cluster — 1 center clue + 6 neighbors
+    // Use absolute positioning within .mini-board (180×180)
+
+    // Mini hex geometry: pointy-top, ~52px wide, 60px tall
+    // Center at (90, 90), neighbors at 60° intervals
+    const cx = 90;
+    const cy = 90;
+    const hexW = 52;
+    const hexH = 60;
+    const radius = 42; // distance from center to neighbor centers
+
+    // 6 neighbor positions (flat-topped: angles 0, 60, 120, 180, 240, 300)
+    const neighborPositions: { x: number; y: number }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i;
+      neighborPositions.push({
+        x: cx + radius * Math.cos(angle) - hexW / 2,
+        y: cy + radius * Math.sin(angle) * 0.75 - hexH / 2,
+      });
+    }
+    const centerPos = { x: cx - hexW / 2, y: cy - hexH / 2 };
+
+    // Before: center clue "2", all 6 neighbors unknown
+    const beforeBoard = document.getElementById('mini-before');
+    if (beforeBoard) {
+      beforeBoard.innerHTML = '';
+      // Center clue
+      const clue = document.createElement('div');
+      clue.className = 'mini-hex clue';
+      clue.style.left = `${centerPos.x}px`;
+      clue.style.top = `${centerPos.y}px`;
+      clue.textContent = '2';
+      beforeBoard.appendChild(clue);
+      // Neighbors — all unknown
+      for (const pos of neighborPositions) {
+        const hex = document.createElement('div');
+        hex.className = 'mini-hex unknown';
+        hex.style.left = `${pos.x}px`;
+        hex.style.top = `${pos.y}px`;
+        beforeBoard.appendChild(hex);
+      }
+    }
+
+    // Solved: center clue "2", 2 neighbors marked (orange), 4 cleared (blue)
+    // Mark the first 2 neighbors (top and top-right)
+    const solvedBoard = document.getElementById('mini-solved');
+    if (solvedBoard) {
+      solvedBoard.innerHTML = '';
+      // Center clue
+      const clue = document.createElement('div');
+      clue.className = 'mini-hex clue';
+      clue.style.left = `${centerPos.x}px`;
+      clue.style.top = `${centerPos.y}px`;
+      clue.textContent = '2';
+      solvedBoard.appendChild(clue);
+      // Neighbors — 2 marked, 4 cleared
+      for (let i = 0; i < 6; i++) {
+        const pos = neighborPositions[i];
+        const hex = document.createElement('div');
+        hex.className = i < 2 ? 'mini-hex marked' : 'mini-hex cleared';
+        hex.style.left = `${pos.x}px`;
+        hex.style.top = `${pos.y}px`;
+        solvedBoard.appendChild(hex);
+      }
+    }
   }
 
   private closeHelp() {

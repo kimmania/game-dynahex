@@ -56,38 +56,51 @@
       <div class="modal-inner">
         <h2>How to Play Dynahex</h2>
         <div class="help-content">
-          <p><strong>Dynahex</strong> is a hex-grid logic puzzle where the board itself is unstable. Cells physically drift across the grid every few moves, rewriting adjacency relationships and invalidating your deductions.</p>
+          <p class="help-intro">Dynahex is a logic puzzle like Hexcells or Minesweeper, but the board <strong>moves</strong>. Every few turns, unanchored cells slide to new positions and clue numbers change.</p>
 
-          <h3>Goal</h3>
-          <p>Mark every <strong style="color: var(--mark)">true</strong> hex (orange) and clear every <strong style="color: var(--clear)">safe</strong> hex (blue). The level is solved when all cells are resolved <em>and</em> the grid survives a full drift tick with zero movement.</p>
+          <h3>Your Goal</h3>
+          <p>The black clue hexes show a number — that's how many of their <strong>adjacent hexes</strong> are "true" (must be marked orange). Every non-clue hex is either true or safe. Use the clues to figure out which is which.</p>
+          <p><strong style="color: var(--mark)">Mark true hexes orange</strong> · <strong style="color: var(--clear)">Clear safe hexes blue</strong> · <strong>Solve every hex to win</strong></p>
 
-          <h3>Cell States</h3>
-          <ul class="cell-legend">
-            <li><span class="demo-cell demo-unknown"></span> <strong>Unknown</strong> — Unresolved; may hold a clue or be empty. Drifts if unanchored.</li>
-            <li><span class="demo-cell demo-mark"></span> <strong>Marked</strong> — Confirmed as part of the solution (orange). Does not drift.</li>
-            <li><span class="demo-cell demo-clear"></span> <strong>Cleared</strong> — Confirmed safe (blue). Does not drift.</li>
-            <li><span class="demo-cell demo-clue">3</span> <strong>Clue</strong> — Shows how many adjacent hexes are true. Drifts if unanchored.</li>
-            <li><span class="demo-cell demo-anchor"></span> <strong>Anchored</strong> — Locked in place (cyan rim). Costs 1 anchor.</li>
-            <li><span class="demo-cell demo-stale"></span> <strong>Stale</strong> — Was correct, but its validating clue drifted away (cosmetic only).</li>
-          </ul>
+          <h3>How Clues Work — A Mini Example</h3>
+          <p>The number on a black clue hex counts how many of its 6 neighbors are true (must be marked orange). Look at this example:</p>
+
+          <div class="help-step">
+            <div class="mini-board" id="mini-before"></div>
+            <div class="help-step-text">
+              <strong>Step 1 — Read the clue.</strong> The center clue says <strong style="color:var(--accent)">2</strong>, meaning exactly 2 of its 6 neighbors are true. The rest are safe.
+            </div>
+          </div>
+
+          <div class="help-step">
+            <div class="mini-board" id="mini-solved"></div>
+            <div class="help-step-text">
+              <strong>Step 2 — Resolve the neighbors.</strong> Two neighbors are <span class="demo-cell demo-mark" style="display:inline-flex;vertical-align:middle;width:20px;height:20px"></span> Marked (true), the rest are <span class="demo-cell demo-clear" style="display:inline-flex;vertical-align:middle;width:20px;height:20px"></span> Cleared (safe). The clue count now matches.
+            </div>
+          </div>
 
           <h3>Controls</h3>
-          <ul>
-            <li><strong>Mark mode</strong> (default): Tap an unknown cell to cycle Marked → Cleared → Unknown.</li>
-            <li><strong>Anchor mode</strong>: Tap any cell to spend 1 anchor and lock it in place. Anchors are limited and don't regenerate.</li>
-            <li><strong>Foresight</strong>: Tap to preview where all unanchored cells will drift on the next tick. Ghost arrows show drift targets; red glow indicates cells that will be lost off the board.</li>
+          <ul class="help-controls">
+            <li><button class="demo-tool active" disabled>Mark</button> <span>Tap an unknown cell to cycle: <span class="demo-cell demo-unknown" style="display:inline-flex;vertical-align:middle;width:18px;height:18px"></span> → <span class="demo-cell demo-mark" style="display:inline-flex;vertical-align:middle;width:18px;height:18px"></span> Marked → <span class="demo-cell demo-clear" style="display:inline-flex;vertical-align:middle;width:18px;height:18px"></span> Cleared → back to unknown. Clue hexes are given — you can't change them.</span></li>
+            <li><button class="demo-tool" disabled>Anchor</button> <span>Spend an anchor to lock a cell in place so it won't drift. Limited supply — use wisely. An anchored cell gets a <span style="color:var(--anchor)">cyan rim</span>.</span></li>
+            <li><button class="demo-tool" disabled>Foresight</button> <span>Preview where cells will drift on the next tick. Ghost arrows show movement; red glow means a cell will be lost off the board edge.</span></li>
           </ul>
 
           <h3>Drift</h3>
-          <p>Every N moves (shown in the status bar), all unanchored <strong>unknown</strong> cells drift to an adjacent empty position using a deterministic seeded order. After drifting, clue numbers update to reflect the new neighbor layout. Resolved and anchored cells never drift.</p>
+          <p>Every N moves (shown in the <strong>goal banner</strong> at the top of the board), all unanchored <strong>unknown</strong> cells slide to an adjacent empty spot. After drifting, clue numbers <strong>recount</strong> based on the new neighbor layout.</p>
+          <p>Marked and Cleared cells <strong>never drift</strong>. Anchored cells never drift. Only unknown cells move.</p>
 
-          <h3>Scoring (✓/🔒)</h3>
+          <h3>Winning</h3>
+          <p>Resolve every hex on the board (mark or clear each one correctly), then survive a drift tick with zero movement. That's full <strong>stabilization</strong>.</p>
+          <p>If too many cells drift off the board, the puzzle becomes unsolvable and you'll need to restart. Use Foresight and anchors to prevent losses.</p>
+
+          <h3>Scoring (✓ / 🔒)</h3>
           <ul class="score-legend">
-            <li><span class="badge done">✓</span> <strong>Stabilized</strong> — All cells resolved; grid survived a drift tick with zero movement.</li>
-            <li><span class="badge done">✓</span> <strong>Conservation</strong> — Used ≤50% of available anchors.</li>
-            <li><span class="badge done">✓</span> <strong>No Losses</strong> — Zero cells drifted off the board edge.</li>
-            <li><span class="badge done">✓</span> <strong>Foresight</strong> — Solved without any cells entering Stale status.</li>
-            <li><span class="badge locked">🔒</span> <strong>Speedrun</strong> — Under par time for the grid size.</li>
+            <li><span class="badge done">✓</span> <strong>Stabilized</strong> — Solved the board.</li>
+            <li><span class="badge done">✓</span> <strong>Conservation</strong> — Used ≤50% of anchors.</li>
+            <li><span class="badge done">✓</span> <strong>No Losses</strong> — No cells drifted off the board.</li>
+            <li><span class="badge done">✓</span> <strong>Foresight</strong> — Never had a cell go stale.</li>
+            <li><span class="badge locked">🔒</span> <strong>Speedrun</strong> — Beat the par time.</li>
           </ul>
         </div>
         <button id="help-close" class="modal-btn">Got it</button>
