@@ -33,18 +33,38 @@ export function allResolved(cells: CellState[]): boolean {
   return cells.every((c) => c.resolution !== 'unknown');
 }
 
-// Check if all resolved cells match the solution
-// Clue cells are always safe (must be cleared), non-clue cells checked against isTrue
+// Validate the board against clue constraints — NOT against a stored solution.
+// This allows multiple valid solutions: any arrangement where every clue's
+// marked-neighbor count matches its displayed number is a correct solution.
+// Clue cells must be cleared (not marked), and all cells must be resolved.
 export function solutionValid(cells: CellState[]): boolean {
-  return cells.every((c) => {
-    if (c.type === 'clue') {
-      // Clue cells are always safe — they should not be marked
-      return c.resolution !== 'marked';
+  const cellMap = buildCellMap(cells);
+
+  // Check that all cells are resolved (no unknowns)
+  if (!allResolved(cells)) return false;
+
+  // Check that clue cells are not marked
+  for (const cell of cells) {
+    if (cell.type === 'clue' && cell.resolution === 'marked') return false;
+  }
+
+  // Check that every clue's count matches its actual marked non-clue neighbors
+  for (const cell of cells) {
+    if (cell.type !== 'clue' || !cell.isGiven) continue;
+
+    const neighbors = getNeighbors(cell.q, cell.r);
+    let markedCount = 0;
+    for (const { q, r } of neighbors) {
+      const neighbor = cellMap.get(hexKey(q, r));
+      if (neighbor && neighbor.type !== 'clue' && neighbor.resolution === 'marked') {
+        markedCount++;
+      }
     }
-    if (c.resolution === 'marked') return c.isTrue;
-    if (c.resolution === 'cleared') return !c.isTrue;
-    return false; // unknown = not fully resolved
-  });
+
+    if (markedCount !== cell.clueCount) return false;
+  }
+
+  return true;
 }
 
 // Check if the puzzle is fully stabilized:

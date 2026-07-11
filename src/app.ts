@@ -5,7 +5,8 @@
 import { LevelDef, GameState, CellState, LevelScores, SaveData, FIRST_LEVEL_ID } from './engine/types';
 import { createGameState, loadLevels, cloneState } from './engine/levels';
 import { recomputeClues, allResolved, solutionValid, isCompromised, computeScores } from './engine/validator';
-import { computeDrift, applyDrift } from './engine/drift';
+import { computeDrift, applyDrift, buildCellMap } from './engine/drift';
+import { getNeighbors, hexKey } from './engine/hexgrid';
 import { loadSave, unlockLevel, markLevelComplete, setHelpSeen, updateSettings } from './engine/storage';
 import { setSoundEnabled, playMark, playClear, playAnchor, playDrift, playInvalid, playWin } from './engine/audio';
 import { BoardRenderer, ToolMode } from './ui/board';
@@ -356,28 +357,39 @@ export class App {
 
   private showWrongSolution() {
     if (!this.state) return;
-    // Count wrong cells for feedback
-    const wrong = this.state.cells.filter((c) => {
-      if (c.type === 'clue') return false;
-      if (c.resolution === 'marked') return !c.isTrue;
-      if (c.resolution === 'cleared') return c.isTrue;
-      return false;
-    });
-    const wrongCount = wrong.length;
-    if (wrongCount === 0) return;
+    // Find clues whose count doesn't match their marked neighbors
+    const cellMap = buildCellMap(this.state.cells);
+    const unsatisfiedClues: { q: number; r: number }[] = [];
+
+    for (const cell of this.state.cells) {
+      if (cell.type !== 'clue' || !cell.isGiven) continue;
+      const neighbors = getNeighbors(cell.q, cell.r);
+      let markedCount = 0;
+      for (const { q, r } of neighbors) {
+        const neighbor = cellMap.get(hexKey(q, r));
+        if (neighbor && neighbor.type !== 'clue' && neighbor.resolution === 'marked') {
+          markedCount++;
+        }
+      }
+      if (markedCount !== cell.clueCount) {
+        unsatisfiedClues.push({ q: cell.q, r: cell.r });
+      }
+    }
+
+    if (unsatisfiedClues.length === 0) return;
 
     playInvalid();
 
-    // Flash wrong cells red on the canvas via renderer
+    // Flash unsatisfied clues red on the canvas
     if (this.renderer) {
-      this.renderer.flashWrongCells(wrong.map((c) => ({ q: c.q, r: c.r })));
+      this.renderer.flashWrongCells(unsatisfiedClues);
     }
 
     // Show a brief toast message
     this.showToast(
-      wrongCount === 1
-        ? '1 cell is wrong — check your marks'
-        : `${wrongCount} cells are wrong — check your marks`,
+      unsatisfiedClues.length === 1
+        ? '1 clue is not satisfied — check your marks'
+        : `${unsatisfiedClues.length} clues are not satisfied — check your marks`,
     );
   }
 
