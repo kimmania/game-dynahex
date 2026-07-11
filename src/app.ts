@@ -202,7 +202,7 @@ export class App {
     const driftLabel = level.driftVariant.charAt(0).toUpperCase() + level.driftVariant.slice(1);
     this.els['goal-banner'].innerHTML = `
       <div class="goal-title">${level.name}</div>
-      <div class="goal-objective">Mark every true hex <span class="obj-mark">orange</span> and clear every safe hex <span class="obj-clear">blue</span> — then survive a drift tick with no movement to win.</div>
+      <div class="goal-objective">Mark every true hex <span class="obj-mark">orange</span> and clear every safe hex <span class="obj-clear">blue</span> to solve the puzzle.</div>
       <div class="goal-info">
         <span class="goal-pill">${level.cells.length} cells</span>
         <span class="goal-pill">${driftLabel} drift (every ${level.driftFrequency} moves)</span>
@@ -330,9 +330,9 @@ export class App {
     if (!this.state || !this.currentLevel) return false;
     if (!allResolved(this.state.cells)) return false;
     if (!solutionValid(this.state.cells)) return false;
-    // Must survive a drift tick with zero movement
-    const moves = computeDrift(this.state, this.currentLevel.gridRadius, this.currentLevel.driftSeed);
-    return moves.length === 0;
+    // Win when all cells are correctly resolved
+    // "Stabilized" (surviving a drift tick) is a bonus star, not a hard gate
+    return true;
   }
 
   private handleWin() {

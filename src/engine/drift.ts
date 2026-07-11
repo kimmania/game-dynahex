@@ -166,8 +166,8 @@ export function applyDrift(state: GameState, moves: DriftMove[]): {
       let count = 0;
       for (const { q, r } of neighbors) {
         const neighbor = cellMap.get(hexKey(q, r));
-        // Only count non-clue cells that are marked (true)
-        if (neighbor && neighbor.type !== 'clue' && neighbor.resolution === 'marked') {
+        // Count non-clue neighbors that are TRUE (the target constraint)
+        if (neighbor && neighbor.type !== 'clue' && neighbor.isTrue) {
           count++;
         }
       }

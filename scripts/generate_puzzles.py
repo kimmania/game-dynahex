@@ -215,16 +215,25 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
     # Volume configurations
-    # Volume I: The Drift Awakens — 19 cells (radius 2), glacial (8), abundant anchors
+    # Volume I: The Drift Awakens — 19 cells (radius 2), glacial, abundant anchors
+    # Early levels have very high drift frequency (essentially no drift) so players
+    # can learn the hex deduction mechanic before dealing with movement.
     v1 = generate_volume(
         "v1", "The Drift Awakens",
-        grid_radius=2, drift_frequency=8, drift_variant="glacial",
+        grid_radius=2, drift_frequency=99, drift_variant="glacial",
         anchor_budget_fn=lambda i, r: max(3, 8 - i),  # 8 down to 3
         loss_tolerance=0,
         par_time_fn=lambda r: 120,
         num_levels=10,
         seed_offset=0,
     )
+    # Increase drift frequency (decrease the number) for later v1 levels
+    for i, level in enumerate(v1):
+        if i >= 6:
+            level["driftFrequency"] = 12  # drift starts on later v1 levels
+        elif i >= 3:
+            level["driftFrequency"] = 20  # very rare drift
+        # levels 0-2: no drift (99 moves = effectively never)
 
     # Volume II: Tidal Zones — 37 cells (radius 3), tidal (5), 3-4 anchors
     v2 = generate_volume(

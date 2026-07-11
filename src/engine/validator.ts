@@ -7,7 +7,9 @@ import { getNeighbors, hexKey } from './hexgrid';
 import { buildCellMap, computeDrift } from './drift';
 
 // Recompute all clue counts from current cell positions
-// Clue counts only count NON-CLUE neighbors that are marked (true)
+// After drift, clue counts must reflect the NEW topology: how many non-clue
+// neighbors are actually TRUE (the target the player must satisfy).
+// This is NOT how many are currently marked — it's the puzzle constraint.
 export function recomputeClues(cells: CellState[]): void {
   const cellMap = buildCellMap(cells);
   for (const cell of cells) {
@@ -16,8 +18,8 @@ export function recomputeClues(cells: CellState[]): void {
       let count = 0;
       for (const { q, r } of neighbors) {
         const neighbor = cellMap.get(hexKey(q, r));
-        // Only count non-clue cells that are marked (true)
-        if (neighbor && neighbor.type !== 'clue' && neighbor.resolution === 'marked') {
+        // Count non-clue neighbors that are TRUE (part of the solution)
+        if (neighbor && neighbor.type !== 'clue' && neighbor.isTrue) {
           count++;
         }
       }
@@ -72,13 +74,13 @@ export function computeScores(
 }
 
 // Check if the current board state is compromised (unsolvable due to drift)
-// A board is compromised if any given clue's count is impossible:
-// - clueCount > number of unresolved neighbors (too many need to be marked)
-// - clueCount < 0 (impossible)
-// - Or if remaining unresolved cells can't satisfy all clues
+// After drift, the topology may have changed. A board is compromised if any
+// clue's target count cannot be satisfied by the remaining non-clue neighbors:
+// - target > total non-clue neighbors (impossible to mark enough)
+// - target < 0 (impossible)
 export function isCompromised(cells: CellState[], gridRadius: number): boolean {
   const cellMap = buildCellMap(cells);
-  const unresolved = cells.filter((c) => c.resolution === 'unknown');
+  const unresolved = cells.filter((c) => c.resolution === 'unknown' && c.type !== 'clue');
   if (unresolved.length === 0) return false;
 
   // Check each clue for impossibility
@@ -86,28 +88,19 @@ export function isCompromised(cells: CellState[], gridRadius: number): boolean {
     if (cell.type !== 'clue' || !cell.isGiven) continue;
 
     const neighbors = getNeighbors(cell.q, cell.r);
-    let markedCount = 0;
-    let unresolvedNeighbors = 0;
-    let totalNeighbors = 0;
+    let nonClueNeighbors = 0;
 
     for (const { q, r } of neighbors) {
       const neighbor = cellMap.get(hexKey(q, r));
       if (!neighbor) continue;
-      // Skip clue neighbors — they don't count toward the clue's target
       if (neighbor.type === 'clue') continue;
-      totalNeighbors++;
-      if (neighbor.resolution === 'marked') markedCount++;
-      else if (neighbor.resolution === 'unknown') unresolvedNeighbors++;
+      nonClueNeighbors++;
     }
 
-    // The clue shows the target count of marked neighbors
-    // Currently marked + potentially markable = max possible
     const targetCount = cell.clueCount;
-    const maxPossible = markedCount + unresolvedNeighbors;
-    const minPossible = markedCount;
 
-    // If we need more marked than possible, or fewer than already marked
-    if (targetCount > maxPossible || targetCount < minPossible) {
+    // If target > total non-clue neighbors, can't satisfy the clue
+    if (targetCount > nonClueNeighbors) {
       return true;
     }
   }
