@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Dynahex" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <title>Dynahex — Spatial Deduction Under Drift</title>
+</head>
+<body>
+  <div id="app">
+    <header id="header">
+      <button id="back-btn" class="header-btn" title="Back to Map" aria-label="Back to Map">‹</button>
+      <h1 id="title">Dynahex</h1>
+      <div class="header-right">
+        <button id="help-btn" class="header-btn" title="Help" aria-label="Help">?</button>
+        <button id="settings-btn" class="header-btn" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+    </header>
+
+    <!-- Map View -->
+    <div id="map-view" class="view">
+      <div id="map-scroll"></div>
+    </div>
+
+    <!-- Game View -->
+    <div id="game-view" class="view" style="display:none">
+      <div id="goal-banner"></div>
+      <div id="canvas-wrap">
+        <canvas id="board-canvas"></canvas>
+      </div>
+      <div id="tool-bar">
+        <button id="tool-mark" class="tool-btn active" title="Mark / Clear mode">Mark</button>
+        <button id="tool-anchor" class="tool-btn" title="Anchor mode">Anchor</button>
+        <button id="tool-foresight" class="tool-btn" title="Foresight Mode (preview drift)">Foresight</button>
+        <button id="undo-btn" class="tool-btn" title="Undo last action">Undo</button>
+        <button id="reset-btn" class="tool-btn" title="Reset level">Reset</button>
+      </div>
+      <div id="status-bar">
+        <span id="move-count">0</span> moves
+        <span class="sep">·</span>
+        <span id="drift-count">0</span>/<span id="drift-freq">8</span> to drift
+        <span class="sep">·</span>
+        <span id="anchor-count">3</span> anchors left
+        <span class="sep">·</span>
+        <span id="resolved-count">0</span>/<span id="total-count">19</span> resolved
+      </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay" style="display:none">
+      <div class="modal-inner">
+        <h2>How to Play Dynahex</h2>
+        <div class="help-content">
+          <p><strong>Dynahex</strong> is a hex-grid logic puzzle where the board itself is unstable. Cells physically drift across the grid every few moves, rewriting adjacency relationships and invalidating your deductions.</p>
+
+          <h3>Goal</h3>
+          <p>Mark every <strong style="color: var(--mark)">true</strong> hex (orange) and clear every <strong style="color: var(--clear)">safe</strong> hex (blue). The level is solved when all cells are resolved <em>and</em> the grid survives a full drift tick with zero movement.</p>
+
+          <h3>Cell States</h3>
+          <ul class="cell-legend">
+            <li><span class="demo-cell demo-unknown"></span> <strong>Unknown</strong> — Unresolved; may hold a clue or be empty. Drifts if unanchored.</li>
+            <li><span class="demo-cell demo-mark"></span> <strong>Marked</strong> — Confirmed as part of the solution (orange). Does not drift.</li>
+            <li><span class="demo-cell demo-clear"></span> <strong>Cleared</strong> — Confirmed safe (blue). Does not drift.</li>
+            <li><span class="demo-cell demo-clue">3</span> <strong>Clue</strong> — Shows how many adjacent hexes are true. Drifts if unanchored.</li>
+            <li><span class="demo-cell demo-anchor"></span> <strong>Anchored</strong> — Locked in place (cyan rim). Costs 1 anchor.</li>
+            <li><span class="demo-cell demo-stale"></span> <strong>Stale</strong> — Was correct, but its validating clue drifted away (cosmetic only).</li>
+          </ul>
+
+          <h3>Controls</h3>
+          <ul>
+            <li><strong>Mark mode</strong> (default): Tap an unknown cell to cycle Marked → Cleared → Unknown.</li>
+            <li><strong>Anchor mode</strong>: Tap any cell to spend 1 anchor and lock it in place. Anchors are limited and don't regenerate.</li>
+            <li><strong>Foresight</strong>: Tap to preview where all unanchored cells will drift on the next tick. Ghost arrows show drift targets; red glow indicates cells that will be lost off the board.</li>
+          </ul>
+
+          <h3>Drift</h3>
+          <p>Every N moves (shown in the status bar), all unanchored <strong>unknown</strong> cells drift to an adjacent empty position using a deterministic seeded order. After drifting, clue numbers update to reflect the new neighbor layout. Resolved and anchored cells never drift.</p>
+
+          <h3>Scoring (✓/🔒)</h3>
+          <ul class="score-legend">
+            <li><span class="badge done">✓</span> <strong>Stabilized</strong> — All cells resolved; grid survived a drift tick with zero movement.</li>
+            <li><span class="badge done">✓</span> <strong>Conservation</strong> — Used ≤50% of available anchors.</li>
+            <li><span class="badge done">✓</span> <strong>No Losses</strong> — Zero cells drifted off the board edge.</li>
+            <li><span class="badge done">✓</span> <strong>Foresight</strong> — Solved without any cells entering Stale status.</li>
+            <li><span class="badge locked">🔒</span> <strong>Speedrun</strong> — Under par time for the grid size.</li>
+          </ul>
+        </div>
+        <button id="help-close" class="modal-btn">Got it</button>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay" style="display:none">
+      <div class="modal-inner">
+        <h2>Settings</h2>
+        <div class="settings-content">
+          <label class="setting-row">
+            <span>Sound Effects</span>
+            <input type="checkbox" id="setting-sound" checked />
+          </label>
+          <label class="setting-row">
+            <span>Reduced Motion</span>
+            <input type="checkbox" id="setting-motion" />
+          </label>
+        </div>
+        <button id="settings-close" class="modal-btn">Close</button>
+      </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victory-modal" class="modal-overlay" style="display:none">
+      <div class="modal-inner">
+        <h2 id="victory-title">Level Complete</h2>
+        <div id="victory-badges"></div>
+        <div id="victory-stats"></div>
+        <div class="modal-buttons">
+          <button id="victory-retry" class="modal-btn">Try Again</button>
+          <button id="victory-next" class="modal-btn primary">Next Level</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compromised Modal -->
+    <div id="compromised-modal" class="modal-overlay" style="display:none">
+      <div class="modal-inner">
+        <h2>Grid Compromised</h2>
+        <p>The drift has made this puzzle unsolvable. You'll need to restart.</p>
+        <button id="compromised-close" class="modal-btn">Restart Level</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
