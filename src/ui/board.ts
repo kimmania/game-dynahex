@@ -350,8 +350,8 @@ export class BoardRenderer {
     const verts = hexVertices(cx, cy, size);
 
     // Determine fill color based on cell state
-    let fill = '#2d333b'; // unknown
-    let strokeColor = '#3d444c';
+    let fill = '#30363d'; // unknown — slightly lighter, clearly "empty"
+    let strokeColor = '#484f58'; // unknown stroke — visible grey
     let strokeWidth = 1.5 * this.dpr;
 
     if (cell.resolution === 'marked') {
@@ -361,9 +361,11 @@ export class BoardRenderer {
       fill = '#1e6feb'; // blue
       strokeColor = '#388bfd';
     } else if (cell.type === 'clue' && cell.isGiven) {
-      fill = '#161b22'; // dark for clue
-      strokeColor = '#58a6ff';
-      strokeWidth = 2 * this.dpr;
+      // Clue cells: distinct dark fill with bright blue-white border
+      // Must be visually unmistakable as a clue, not just "another dark cell"
+      fill = '#0a1628'; // very dark blue-black
+      strokeColor = '#79c0ff'; // bright sky blue
+      strokeWidth = 2.5 * this.dpr;
     }
 
     // Draw hex path
@@ -392,10 +394,25 @@ export class BoardRenderer {
       ctx.stroke();
     }
 
-    // Draw clue number
+    // Draw clue number — large, bold, with a subtle glow for emphasis
     if (cell.type === 'clue' && cell.isGiven) {
+      // Inner glow ring for clue cells (makes them visually distinct from unknowns)
+      ctx.beginPath();
+      ctx.moveTo(verts[0].x, verts[0].y);
+      for (let i = 1; i < verts.length; i++) {
+        ctx.lineTo(verts[i].x, verts[i].y);
+      }
+      ctx.closePath();
+      ctx.shadowColor = 'rgba(121, 192, 255, 0.3)';
+      ctx.shadowBlur = 8 * this.dpr;
+      ctx.strokeStyle = 'rgba(121, 192, 255, 0.15)';
+      ctx.lineWidth = 1 * this.dpr;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Large bold number — the key information the player reads
       ctx.fillStyle = '#e6edf3';
-      ctx.font = `bold ${Math.round(size * 0.55)}px system-ui, sans-serif`;
+      ctx.font = `bold ${Math.round(size * 0.6)}px system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(cell.clueCount), cx, cy);
