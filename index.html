@@ -34,8 +34,9 @@
         <canvas id="board-canvas"></canvas>
       </div>
       <div id="tool-bar">
-        <button id="tool-mark" class="tool-btn active" title="Mark / Clear mode">Mark</button>
-        <button id="tool-anchor" class="tool-btn" title="Anchor mode">Anchor</button>
+        <button id="tool-mark" class="tool-btn active" title="Mark true hexes (orange)">Mark</button>
+        <button id="tool-clear" class="tool-btn" title="Clear safe hexes (blue)">Clear</button>
+        <button id="tool-anchor" class="tool-btn" title="Anchor mode — lock a cell in place">Anchor</button>
         <button id="tool-foresight" class="tool-btn" title="Foresight Mode (preview drift)">Foresight</button>
         <button id="undo-btn" class="tool-btn" title="Undo last action">Undo</button>
         <button id="reset-btn" class="tool-btn" title="Reset level">Reset</button>
@@ -81,7 +82,8 @@
 
           <h3>Controls</h3>
           <ul class="help-controls">
-            <li><button class="demo-tool active" disabled>Mark</button> <span>Tap an unknown cell to cycle: <span class="demo-cell demo-unknown" style="display:inline-flex;vertical-align:middle;width:18px;height:18px"></span> → <span class="demo-cell demo-mark" style="display:inline-flex;vertical-align:middle;width:18px;height:18px"></span> Marked → <span class="demo-cell demo-clear" style="display:inline-flex;vertical-align:middle;width:18px;height:18px"></span> Cleared → back to unknown. Clue hexes are given — you can't change them.</span></li>
+            <li><button class="demo-tool active" disabled>Mark</button> <span>Tap an unknown cell to mark it orange (true). Tap an already-marked cell to unmark it.</span></li>
+            <li><button class="demo-tool" disabled>Clear</button> <span>Tap an unknown cell to clear it blue (safe). Tap an already-cleared cell to unclear it.</span></li>
             <li><button class="demo-tool" disabled>Anchor</button> <span>Spend an anchor to lock a cell in place so it won't drift. Limited supply — use wisely. An anchored cell gets a <span style="color:var(--anchor)">cyan rim</span>.</span></li>
             <li><button class="demo-tool" disabled>Foresight</button> <span>Preview where cells will drift on the next tick. Ghost arrows show movement; red glow means a cell will be lost off the board edge.</span></li>
           </ul>

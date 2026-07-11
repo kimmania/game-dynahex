@@ -359,6 +359,31 @@ html, body {
   border-color: var(--accent);
 }
 
+/* Mark and Clear get distinct colors matching their cell colors */
+#tool-mark.active {
+  background: var(--mark);
+  border-color: var(--mark);
+  color: #fff;
+}
+
+#tool-clear.active {
+  background: var(--clear);
+  border-color: var(--clear);
+  color: #fff;
+}
+
+#tool-anchor.active {
+  background: var(--anchor);
+  border-color: var(--anchor);
+  color: #0d1117;
+}
+
+#tool-foresight.active {
+  background: #a78bfa;
+  border-color: #a78bfa;
+  color: #fff;
+}
+
 .tool-btn.disabled {
   opacity: 0.4;
   pointer-events: none;

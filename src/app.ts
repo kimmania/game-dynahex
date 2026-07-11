@@ -52,7 +52,7 @@ export class App {
       'back-btn', 'title', 'help-btn', 'settings-btn',
       'map-view', 'map-scroll',
       'game-view', 'goal-banner', 'canvas-wrap',
-      'tool-mark', 'tool-anchor', 'tool-foresight', 'undo-btn', 'reset-btn',
+      'tool-mark', 'tool-clear', 'tool-anchor', 'tool-foresight', 'undo-btn', 'reset-btn',
       'move-count', 'drift-count', 'drift-freq', 'anchor-count', 'resolved-count', 'total-count',
       'help-modal', 'help-close',
       'settings-modal', 'settings-close', 'setting-sound', 'setting-motion',
@@ -219,25 +219,36 @@ export class App {
 
     if (this.tool === 'anchor') {
       this.handleAnchorTap(cell);
+    } else if (this.tool === 'clear') {
+      this.handleClearTap(cell);
     } else {
       this.handleMarkTap(cell);
     }
   }
 
   private handleMarkTap(cell: CellState) {
-    if (cell.anchored && cell.resolution !== 'unknown') return; // Can't change anchored resolved cells
     if (cell.isGiven && cell.type === 'clue') return; // Can't change given clues
 
-    // Cycle: unknown → marked → cleared → unknown
-    const oldResolution = cell.resolution;
-    if (oldResolution === 'unknown') {
+    // Mark mode: tapping toggles between 'marked' and 'unknown'
+    if (cell.resolution === 'marked') {
+      cell.resolution = 'unknown';
+    } else {
       cell.resolution = 'marked';
       playMark();
-    } else if (oldResolution === 'marked') {
+    }
+
+    this.postMove();
+  }
+
+  private handleClearTap(cell: CellState) {
+    if (cell.isGiven && cell.type === 'clue') return; // Can't change given clues
+
+    // Clear mode: tapping toggles between 'cleared' and 'unknown'
+    if (cell.resolution === 'cleared') {
+      cell.resolution = 'unknown';
+    } else {
       cell.resolution = 'cleared';
       playClear();
-    } else {
-      cell.resolution = 'unknown';
     }
 
     this.postMove();
@@ -516,9 +527,9 @@ export class App {
   }
 
   private updateToolButtons() {
-    for (const tool of ['mark', 'anchor', 'foresight'] as ToolMode[]) {
-      const btn = this.els[`tool-${tool}`] as HTMLElement;
-      btn.classList.toggle('active', this.tool === tool);
+    for (const tool of ['mark', 'clear', 'anchor', 'foresight'] as ToolMode[]) {
+      const btn = this.els[`tool-${tool}`];
+      if (btn) btn.classList.toggle('active', this.tool === tool);
     }
   }
 
@@ -657,6 +668,7 @@ export class App {
     this.els['settings-close'].addEventListener('click', () => this.closeSettings());
 
     this.els['tool-mark'].addEventListener('click', () => this.setTool('mark'));
+    this.els['tool-clear'].addEventListener('click', () => this.setTool('clear'));
     this.els['tool-anchor'].addEventListener('click', () => this.setTool('anchor'));
     this.els['tool-foresight'].addEventListener('click', () => this.setTool('foresight'));
     this.els['undo-btn'].addEventListener('click', () => this.undo());

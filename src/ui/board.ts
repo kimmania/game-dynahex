@@ -6,7 +6,7 @@ import { CellState, GameState, LevelDef } from '../engine/types';
 import { hexToPixel, hexVertices } from '../engine/hexgrid';
 import { DriftMove, previewDrift } from '../engine/drift';
 
-export type ToolMode = 'mark' | 'anchor' | 'foresight';
+export type ToolMode = 'mark' | 'clear' | 'anchor' | 'foresight';
 
 interface DriftAnimation {
   moves: DriftMove[];
@@ -188,17 +188,6 @@ export class BoardRenderer {
       }
       return;
     }
-
-    // Long press timer for anchor (500ms)
-    if (this.tool === 'mark') {
-      this.longPressTimer = window.setTimeout(() => {
-        const cell = this.findCellAt(e.clientX, e.clientY);
-        if (cell && cell.resolution === 'unknown' && !cell.anchored) {
-          this.longPressFired = true;
-          this.placeAnchor(cell.q, cell.r);
-        }
-      }, 500);
-    }
   }
 
   private handlePointerMove(e: PointerEvent) {
@@ -252,13 +241,6 @@ export class BoardRenderer {
       clearTimeout(this.longPressTimer);
       this.longPressTimer = null;
     }
-  }
-
-  private placeAnchor(q: number, r: number) {
-    // Called from long-press; we'll delegate to onTap with a special mode
-    // Actually, we should call a different handler. Let's use onTap for now
-    // and let the app handle it based on the tool mode.
-    this.onTap(q, r);
   }
 
   // ============================================================
