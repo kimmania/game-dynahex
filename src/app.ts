@@ -266,13 +266,9 @@ export class App {
   private postMove() {
     if (!this.state || !this.currentLevel) return;
 
-    // Recompute clue counts
-    recomputeClues(this.state.cells);
-
-    // Check for stale
-    // (Stale is cosmetic only per design doc open question #1)
-    // Cells become stale if they're marked but no clue validates them
-    // We skip this for now — stale is cosmetic and we don't track it deeply
+    // Do NOT recompute clue counts here — they are target values from the
+    // level definition (how many neighbors SHOULD be marked). They only
+    // change when the topology changes (drift), not when the player marks/clears.
 
     // Increment move count
     this.state.moves++;

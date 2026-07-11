@@ -3,7 +3,6 @@
 // ============================================================
 
 import { LevelDef, CellDef, CellState, GameState, SAVE_VERSION } from './types';
-import { recomputeClues } from './validator';
 
 let levelCache: Record<string, LevelDef[]> | null = null;
 
@@ -49,8 +48,11 @@ export function createGameState(level: LevelDef): GameState {
     originalR: def.r,
   }));
 
-  // Compute initial clue counts
-  recomputeClues(cells);
+  // Do NOT call recomputeClues here — the clue counts from the level JSON
+  // are the target values (how many neighbors SHOULD be marked).
+  // recomputeClues counts currently-marked neighbors, which is 0 at start.
+  // It should only be called after drift events to recalculate targets
+  // based on the new topology.
 
   return {
     levelId: level.id,
