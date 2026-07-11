@@ -74,6 +74,8 @@ def place_clues(coords: List[Tuple[int, int]], solution: Dict[Tuple[int, int], b
                 rng: random.Random, clue_density: float = 0.4) -> Tuple[Set[Tuple[int, int]], Dict[Tuple[int, int], int]]:
     """
     Place clue cells and compute their adjacency counts.
+    Clue cells are always SAFE (isTrue=False), like in Hexcells/Minesweeper.
+    Clue counts only count NON-CLUE neighbors that are true.
     Returns (set of clue coords, map of clue coord to count).
     """
     coord_set = set(coords)
@@ -85,14 +87,18 @@ def place_clues(coords: List[Tuple[int, int]], solution: Dict[Tuple[int, int], b
     rng.shuffle(shuffled)
     num_clues = max(1, int(len(coords) * clue_density))
 
+    # Place clues and mark them as safe in the solution
     for coord in shuffled[:num_clues]:
-        # Compute adjacency count: how many neighbors are true
+        clue_cells.add(coord)
+        solution[coord] = False  # Clues are always safe
+
+    # Now compute clue counts: only count NON-CLUE true neighbors
+    for coord in clue_cells:
         q, r = coord
         count = 0
         for nq, nr in get_neighbors(q, r):
-            if (nq, nr) in coord_set and solution.get((nq, nr), False):
+            if (nq, nr) in coord_set and (nq, nr) not in clue_cells and solution.get((nq, nr), False):
                 count += 1
-        clue_cells.add(coord)
         clue_counts[coord] = count
 
     return clue_cells, clue_counts
@@ -113,12 +119,11 @@ def generate_level(level_id: str, name: str, volume: str, volume_label: str,
     # Build cells array
     cells = []
     for q, r in coords:
-        is_true = solution.get((q, r), False)
         if (q, r) in clue_cells:
             cells.append({
                 "q": q, "r": r,
                 "type": "clue",
-                "isTrue": is_true,
+                "isTrue": False,  # Clues are always safe
                 "isGiven": True,
                 "clueCount": clue_counts[(q, r)],
             })
@@ -126,7 +131,7 @@ def generate_level(level_id: str, name: str, volume: str, volume_label: str,
             cells.append({
                 "q": q, "r": r,
                 "type": "unknown",
-                "isTrue": is_true,
+                "isTrue": solution.get((q, r), False),
             })
 
     return {

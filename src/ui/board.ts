@@ -350,22 +350,23 @@ export class BoardRenderer {
     const verts = hexVertices(cx, cy, size);
 
     // Determine fill color based on cell state
+    // Clue cells take priority — they always show as clues regardless of resolution
     let fill = '#30363d'; // unknown — slightly lighter, clearly "empty"
     let strokeColor = '#484f58'; // unknown stroke — visible grey
     let strokeWidth = 1.5 * this.dpr;
 
-    if (cell.resolution === 'marked') {
-      fill = '#d97706'; // orange
-      strokeColor = '#f59e0b';
-    } else if (cell.resolution === 'cleared') {
-      fill = '#1e6feb'; // blue
-      strokeColor = '#388bfd';
-    } else if (cell.type === 'clue' && cell.isGiven) {
+    if (cell.type === 'clue' && cell.isGiven) {
       // Clue cells: distinct dark fill with bright blue-white border
       // Must be visually unmistakable as a clue, not just "another dark cell"
       fill = '#0a1628'; // very dark blue-black
       strokeColor = '#79c0ff'; // bright sky blue
       strokeWidth = 2.5 * this.dpr;
+    } else if (cell.resolution === 'marked') {
+      fill = '#d97706'; // orange
+      strokeColor = '#f59e0b';
+    } else if (cell.resolution === 'cleared') {
+      fill = '#1e6feb'; // blue
+      strokeColor = '#388bfd';
     }
 
     // Draw hex path

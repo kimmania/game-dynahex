@@ -37,7 +37,8 @@ export function createGameState(level: LevelDef): GameState {
     q: def.q,
     r: def.r,
     type: def.type,
-    resolution: 'unknown' as const,
+    // Clue cells are pre-resolved as "cleared" (safe) — they're information, not part of the solution
+    resolution: (def.type === 'clue' ? 'cleared' : 'unknown') as CellState['resolution'],
     isTrue: def.isTrue,
     anchored: false,
     stale: false,

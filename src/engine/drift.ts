@@ -21,15 +21,9 @@ export function getDriftEligible(cells: CellState[]): CellState[] {
   const cellMap = buildCellMap(cells);
   const eligible: CellState[] = [];
   for (const cell of cells) {
-    // Only unknown-resolution cells drift (not marked, not cleared, not given clues)
+    // Only unknown-resolution cells drift (not marked, not cleared, not clues)
     if (cell.resolution !== 'unknown') continue;
     if (cell.anchored) continue;
-    // Given clues also drift if unanchored (they're not resolved)
-    if (cell.type === 'clue' && cell.isGiven) {
-      // Given clues drift too — they're still "unknown" resolution in a sense
-      // Actually, given clues are always visible but they do drift
-      // They should drift since they're not resolved
-    }
     // Check for at least one unoccupied adjacent hex
     const neighbors = getNeighbors(cell.q, cell.r);
     const hasUnoccupied = neighbors.some(({ q, r }) => !cellMap.has(hexKey(q, r)));
@@ -172,7 +166,8 @@ export function applyDrift(state: GameState, moves: DriftMove[]): {
       let count = 0;
       for (const { q, r } of neighbors) {
         const neighbor = cellMap.get(hexKey(q, r));
-        if (neighbor && neighbor.resolution === 'marked') {
+        // Only count non-clue cells that are marked (true)
+        if (neighbor && neighbor.type !== 'clue' && neighbor.resolution === 'marked') {
           count++;
         }
       }

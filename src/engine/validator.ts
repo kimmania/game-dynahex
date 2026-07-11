@@ -7,6 +7,7 @@ import { getNeighbors, hexKey } from './hexgrid';
 import { buildCellMap, computeDrift } from './drift';
 
 // Recompute all clue counts from current cell positions
+// Clue counts only count NON-CLUE neighbors that are marked (true)
 export function recomputeClues(cells: CellState[]): void {
   const cellMap = buildCellMap(cells);
   for (const cell of cells) {
@@ -15,7 +16,8 @@ export function recomputeClues(cells: CellState[]): void {
       let count = 0;
       for (const { q, r } of neighbors) {
         const neighbor = cellMap.get(hexKey(q, r));
-        if (neighbor && neighbor.resolution === 'marked') {
+        // Only count non-clue cells that are marked (true)
+        if (neighbor && neighbor.type !== 'clue' && neighbor.resolution === 'marked') {
           count++;
         }
       }
@@ -30,8 +32,13 @@ export function allResolved(cells: CellState[]): boolean {
 }
 
 // Check if all resolved cells match the solution
+// Clue cells are always safe (must be cleared), non-clue cells checked against isTrue
 export function solutionValid(cells: CellState[]): boolean {
   return cells.every((c) => {
+    if (c.type === 'clue') {
+      // Clue cells are always safe — they should not be marked
+      return c.resolution !== 'marked';
+    }
     if (c.resolution === 'marked') return c.isTrue;
     if (c.resolution === 'cleared') return !c.isTrue;
     return false; // unknown = not fully resolved
@@ -86,6 +93,8 @@ export function isCompromised(cells: CellState[], gridRadius: number): boolean {
     for (const { q, r } of neighbors) {
       const neighbor = cellMap.get(hexKey(q, r));
       if (!neighbor) continue;
+      // Skip clue neighbors — they don't count toward the clue's target
+      if (neighbor.type === 'clue') continue;
       totalNeighbors++;
       if (neighbor.resolution === 'marked') markedCount++;
       else if (neighbor.resolution === 'unknown') unresolvedNeighbors++;
