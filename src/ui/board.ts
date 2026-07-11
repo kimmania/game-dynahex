@@ -82,6 +82,15 @@ export class BoardRenderer {
     this.reducedMotion = reduced;
   }
 
+  private wrongFlashCells: { q: number; r: number }[] = [];
+  private wrongFlashUntil = 0;
+
+  flashWrongCells(cells: { q: number; r: number }[]) {
+    this.wrongFlashCells = cells;
+    this.wrongFlashUntil = performance.now() + 2000; // flash for 2 seconds
+    this.render();
+  }
+
   setLevel(level: LevelDef, state: GameState) {
     this.level = level;
     this.state = state;
@@ -381,6 +390,24 @@ export class BoardRenderer {
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = strokeWidth;
     ctx.stroke();
+
+    // Draw red flash for wrong cells
+    const isWrong = this.wrongFlashCells.some((c) => c.q === cell.q && c.r === cell.r);
+    if (isWrong && performance.now() < this.wrongFlashUntil) {
+      const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 150);
+      ctx.beginPath();
+      ctx.moveTo(verts[0].x, verts[0].y);
+      for (let i = 1; i < verts.length; i++) {
+        ctx.lineTo(verts[i].x, verts[i].y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = `rgba(248, 113, 113, ${pulse})`;
+      ctx.lineWidth = 5 * this.dpr;
+      ctx.stroke();
+    } else if (isWrong) {
+      // Remove from wrong flash list after expiry
+      this.wrongFlashCells = this.wrongFlashCells.filter((c) => !(c.q === cell.q && c.r === cell.r));
+    }
 
     // Draw anchored rim (cyan)
     if (cell.anchored) {

@@ -286,6 +286,8 @@ export class App {
     // Check for win
     if (this.checkWin()) {
       this.handleWin();
+    } else if (this.allResolvedButWrong()) {
+      this.showWrongSolution();
     }
 
     this.refresh();
@@ -333,6 +335,57 @@ export class App {
     // Win when all cells are correctly resolved
     // "Stabilized" (surviving a drift tick) is a bonus star, not a hard gate
     return true;
+  }
+
+  private allResolvedButWrong(): boolean {
+    if (!this.state) return false;
+    if (!allResolved(this.state.cells)) return false;
+    return !solutionValid(this.state.cells);
+  }
+
+  private showWrongSolution() {
+    if (!this.state) return;
+    // Count wrong cells for feedback
+    const wrong = this.state.cells.filter((c) => {
+      if (c.type === 'clue') return false;
+      if (c.resolution === 'marked') return !c.isTrue;
+      if (c.resolution === 'cleared') return c.isTrue;
+      return false;
+    });
+    const wrongCount = wrong.length;
+    if (wrongCount === 0) return;
+
+    playInvalid();
+
+    // Flash wrong cells red on the canvas via renderer
+    if (this.renderer) {
+      this.renderer.flashWrongCells(wrong.map((c) => ({ q: c.q, r: c.r })));
+    }
+
+    // Show a brief toast message
+    this.showToast(
+      wrongCount === 1
+        ? '1 cell is wrong — check your marks'
+        : `${wrongCount} cells are wrong — check your marks`,
+    );
+  }
+
+  private toastTimer: number | null = null;
+
+  private showToast(msg: string) {
+    let toast = document.getElementById('game-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'game-toast';
+      toast.className = 'game-toast';
+      document.getElementById('game-view')!.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    if (this.toastTimer !== null) clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => {
+      toast!.classList.remove('visible');
+    }, 3000);
   }
 
   private handleWin() {
