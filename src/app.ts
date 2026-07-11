@@ -286,8 +286,6 @@ export class App {
     // Check for win
     if (this.checkWin()) {
       this.handleWin();
-    } else if (isCompromised(this.state.cells, this.currentLevel.gridRadius)) {
-      this.handleCompromised();
     }
 
     this.refresh();
