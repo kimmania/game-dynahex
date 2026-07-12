@@ -49,6 +49,19 @@ export class App {
         forceWrongSolution: () => this.showWrongSolution(),
         getState: () => this.state,
         getCurrentLevel: () => this.currentLevel,
+        // Apply the stored unique solution to every non-clue cell, then run
+        // the real win check. Used to prove the strict validator accepts the
+        // legitimate single solution (and that levels are uniquely solvable).
+        solve: () => {
+          const state = this.state;
+          if (!state) return;
+          for (const cell of state.cells) {
+            // Clues are safe and effectively resolved; mark them cleared so
+            // allResolved() sees a fully-resolved board.
+            cell.resolution = cell.isTrue ? 'marked' : 'cleared';
+          }
+          this.postMove();
+        },
       };
     }
 

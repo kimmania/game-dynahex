@@ -18,7 +18,7 @@ import os
 import random
 import math
 import hashlib
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict, Set, Optional
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'public', 'levels')
 
@@ -71,28 +71,24 @@ def generate_solution(coords: List[Tuple[int, int]], rng: random.Random, density
 
 
 def place_clues(coords: List[Tuple[int, int]], solution: Dict[Tuple[int, int], bool],
-                rng: random.Random, clue_density: float = 0.4) -> Tuple[Set[Tuple[int, int]], Dict[Tuple[int, int], int]]:
+                rng: random.Random, clue_set: Set[Tuple[int, int]],
+                coord_cap: Optional[int] = None) -> Tuple[Set[Tuple[int, int]], Dict[Tuple[int, int], int]]:
     """
-    Place clue cells and compute their adjacency counts.
-    Clue cells are always SAFE (isTrue=False), like in Hexcells/Minesweeper.
+    Place clue cells from the provided clue_set (already chosen) and compute
+    their adjacency counts. Clue cells are always SAFE (isTrue=False).
     Clue counts only count NON-CLUE neighbors that are true.
+    `coord_cap` optionally caps the total number of clues (unused for the
+    initial placement; used by the uniqueness loop to bound growth).
     Returns (set of clue coords, map of clue coord to count).
     """
     coord_set = set(coords)
-    clue_cells: Set[Tuple[int, int]] = set()
-    clue_counts: Dict[Tuple[int, int], int] = {}
-
-    # Select a subset of cells to be clues
-    shuffled = list(coords)
-    rng.shuffle(shuffled)
-    num_clues = max(1, int(len(coords) * clue_density))
-
-    # Place clues and mark them as safe in the solution
-    for coord in shuffled[:num_clues]:
-        clue_cells.add(coord)
-        solution[coord] = False  # Clues are always safe
+    clue_cells: Set[Tuple[int, int]] = set(clue_set)
+    # Ensure clues are marked safe in the solution
+    for coord in clue_cells:
+        solution[coord] = False
 
     # Now compute clue counts: only count NON-CLUE true neighbors
+    clue_counts: Dict[Tuple[int, int], int] = {}
     for coord in clue_cells:
         q, r = coord
         count = 0
@@ -104,17 +100,146 @@ def place_clues(coords: List[Tuple[int, int]], solution: Dict[Tuple[int, int], b
     return clue_cells, clue_counts
 
 
+def count_solutions(coords: List[Tuple[int, int]],
+                    clue_cells: Set[Tuple[int, int]],
+                    clue_counts: Dict[Tuple[int, int], int],
+                    cap: int = 2) -> int:
+    """
+    Count the number of arrangements consistent with every clue
+    (clue count = number of true non-clue neighbors), using constraint
+    propagation + backtracking. Returns the count, capped at `cap`
+    (we only care whether it is exactly 1 — more than `cap`-1
+    means "ambiguous / needs guessing"). This is the correct
+    uniqueness test: a puzzle is valid iff this returns 1.
+    """
+    coord_set = set(coords)
+    # resolution: None=unknown, True=marked(true), False=cleared(safe)
+    res: Dict[Tuple[int, int], Optional[bool]] = {c: None for c in coords}
+    for c in clue_cells:
+        res[c] = False  # clues are always safe
+
+    # Precompute each clue's non-clue neighbor list once.
+    clue_nbrs: Dict[Tuple[int, int], List[Tuple[int, int]]] = {}
+    for clue in clue_cells:
+        clue_nbrs[clue] = [(nq, nr) for nq, nr in get_neighbors(*clue)
+                            if (nq, nr) in coord_set and (nq, nr) not in clue_cells]
+
+    def propagate() -> bool:
+        """Apply the two simple deduction rules until stable.
+        Returns False if a contradiction is found."""
+        changed = True
+        while changed:
+            changed = False
+            for clue in clue_cells:
+                c = clue_counts[clue]
+                nbrs = clue_nbrs[clue]
+                marked = sum(1 for n in nbrs if res[n] is True)
+                cleared = sum(1 for n in nbrs if res[n] is False)
+                unknown = [n for n in nbrs if res[n] is None]
+                if marked > c or cleared > c:
+                    return False  # contradiction
+                if c == marked and unknown:
+                    for n in unknown:
+                        res[n] = False
+                    changed = True
+                elif c == marked + len(unknown) and unknown:
+                    for n in unknown:
+                        res[n] = True
+                    changed = True
+        return True
+
+    def recurse() -> int:
+        if not propagate():
+            return 0
+        # Any contradiction already handled; find an unresolved cell.
+        unknown = [c for c in coords if res[c] is None]
+        if not unknown:
+            return 1  # fully resolved, one valid arrangement
+        # Branch on the first unknown (True/False).
+        cell = unknown[0]
+        total = 0
+        for val in (True, False):
+            saved = res[cell]
+            res[cell] = val
+            total += recurse()
+            res[cell] = saved
+            if total >= cap:
+                return total  # early-out: ambiguous enough
+        return total
+
+    return recurse()
+
+
+def is_uniquely_solvable(coords: List[Tuple[int, int]],
+                         clue_cells: Set[Tuple[int, int]],
+                         clue_counts: Dict[Tuple[int, int], int]) -> bool:
+    """True iff exactly one arrangement satisfies every clue (no guessing)."""
+    return count_solutions(coords, clue_cells, clue_counts) == 1
+
 def generate_level(level_id: str, name: str, volume: str, volume_label: str,
                    grid_radius: int, drift_frequency: int, anchor_budget: int,
                    loss_tolerance: int, drift_seed: str, drift_variant: str,
-                   par_time: int, rng: random.Random) -> dict:
-    """Generate a single level definition."""
-    coords = hex_grid_coords(grid_radius)
-    solution = generate_solution(coords, rng, density=0.45 + rng.random() * 0.15)
+                   par_time: int) -> dict:
+    """
+    Generate a single level definition.
 
-    # Place clues with varying density
-    clue_density = max(0.25, 0.5 - grid_radius * 0.03)
-    clue_cells, clue_counts = place_clues(coords, solution, rng, clue_density)
+    The puzzle MUST have exactly ONE solution (no guessing). We build a
+    solution, seed a sparse clue set of SAFE cells, then (a) grow clues and
+    (b) reroll the solution to new deterministic seeds until
+    count_solutions()==1. The user reported "First Tremor has two places a
+    clear/mark can be swapped" -- that is genuine ambiguity (count==2),
+    which strict win-validation would have rejected as "wrong". This loop
+    eliminates it. Each attempt is seeded from drift_seed so a given level
+    id always yields the same valid puzzle.
+    """
+    coords = hex_grid_coords(grid_radius)
+    coord_set = set(coords)
+    max_clues = int(len(coords) * 0.7)  # bound clue growth; keep it a puzzle
+
+    best = None
+    for attempt in range(400):
+        rng = random.Random(f"{drift_seed}:sol:{attempt}")
+        solution = generate_solution(coords, rng, density=0.45 + rng.random() * 0.15)
+
+        # Sparse initial clue set drawn from SAFE cells only.
+        safe_cells = [c for c in coords if not solution.get(c, False)]
+        rng.shuffle(safe_cells)
+        initial_clues = max(1, int(len(coords) * max(0.25, 0.5 - grid_radius * 0.03)))
+        clue_cells: Set[Tuple[int, int]] = set(
+            c for c in safe_cells[:initial_clues] if not solution.get(c, False))
+
+        clue_cells, clue_counts = place_clues(coords, solution, rng, clue_cells)
+
+        # Grow clues (add safe unknowns) until unique or we run out of room.
+        grow = 0
+        while count_solutions(coords, clue_cells, clue_counts) != 1:
+            pool = [c for c in safe_cells if c not in clue_cells]
+            if not pool or len(clue_cells) >= max_clues:
+                break
+            rng.shuffle(pool)
+            add = pool[: max(1, len(pool) // 4)]
+            clue_cells.update(add)
+            clue_cells, clue_counts = place_clues(coords, solution, rng, clue_cells)
+            grow += 1
+            if grow > 600:
+                break
+
+        n = count_solutions(coords, clue_cells, clue_counts)
+        if n == 1:
+            best = (solution, clue_cells, clue_counts)
+            break
+        # n > 1 (ambiguous) or 0 (over-clued contradiction) -> try next seed.
+
+    if best is None:
+        # Should be unreachable; fall back to a fresh solution + max clues.
+        rng = random.Random(f"{drift_seed}:fallback")
+        solution = generate_solution(coords, rng, density=0.5)
+        safe_cells = [c for c in coords if not solution.get(c, False)]
+        clue_cells = set(c for c in safe_cells if not solution.get(c, False))
+        clue_cells, clue_counts = place_clues(coords, solution, rng, clue_cells)
+        best = (solution, clue_cells, clue_counts)
+
+    solution, clue_cells, clue_counts = best
 
     # Build cells array
     cells = []
@@ -191,7 +316,6 @@ def generate_volume(volume_id: str, volume_label: str, grid_radius: int,
     for i in range(num_levels):
         level_id = f"dh-{volume_id}-l{i+1:02d}"
         name = names[i] if i < len(names) else f"Level {i+1}"
-        rng = random.Random(f"dynahex-{volume_id}-{i}")
         drift_seed = hashlib.md5(f"{volume_id}-{i:02d}".encode()).hexdigest()[:6]
         anchor_budget = anchor_budget_fn(i, grid_radius)
         loss_tolerance = loss_tolerance_fn(i, grid_radius)
@@ -209,7 +333,6 @@ def generate_volume(volume_id: str, volume_label: str, grid_radius: int,
             drift_seed=drift_seed,
             drift_variant=drift_variant,
             par_time=par_time,
-            rng=rng,
         )
         levels.append(level)
 

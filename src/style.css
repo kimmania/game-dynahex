@@ -404,9 +404,11 @@ html, body {
 /* Toast */
 .game-toast {
   position: absolute;
-  top: 50%;
+  /* Anchor to the bottom of the game view so it never covers the board
+     or the problem cells the red flash is pointing at. */
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
+  bottom: 76px; /* sit above the tool bar */
+  transform: translate(-50%, 8px) scale(0.9);
   background: var(--bg-elevated);
   border: 1px solid var(--danger);
   color: var(--text);
@@ -418,13 +420,14 @@ html, body {
   opacity: 0;
   transition: opacity 0.2s, transform 0.2s;
   pointer-events: none;
+  max-width: calc(100% - 24px);
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .game-toast.visible {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(-50%, 0) scale(1);
 }
 
 .sep {

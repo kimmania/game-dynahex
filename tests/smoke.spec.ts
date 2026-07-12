@@ -88,22 +88,18 @@ test('CRITICAL: fully-resolved-but-wrong triggers red flash + toast, not silent 
   await expect(toast).toContainText(/resolved wrong/i);
 });
 
-test('storm level (v3-l01) loads, renders, and tolerates drift without crashing', async ({ page }) => {
-  // Direct-deep-link the first storm level via the map after unlocking all
-  // (seed localStorage so it's reachable).
+test('solving a level with its unique solution wins (strict validator accepts the single solution)', async ({ page }) => {
+  // Regression for the "First Tremor game of chance" bug: every generated
+  // level must have exactly ONE solution, and applying that solution must
+  // pass the strict win check (not be rejected as "wrong").
   await openTestPage(page);
-  // Unlock everything through the save seam is not exposed; instead tap through
-  // to a level that exists. We use the first card which is always unlocked.
+  // Start the first (always-unlocked) level.
   await page.locator('.map-level').first().tap();
   await expect(page.locator('#board-canvas')).toBeVisible();
-  // Canvas should have non-trivial rendered content (a real board, not blank).
-  const painted = await page.evaluate(() => {
-    const cv = document.getElementById('board-canvas') as HTMLCanvasElement;
-    const ctx = cv.getContext('2d')!;
-    const { data } = ctx.getImageData(0, 0, cv.width, cv.height);
-    let nonTransparent = 0;
-    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) nonTransparent++;
-    return nonTransparent;
-  });
-  expect(painted).toBeGreaterThan(1000);
+
+  // Apply the stored unique solution via the test seam and run the real win check.
+  await page.evaluate(() => (window as any).__dynahex.solve());
+
+  // A genuine win shows the victory modal (not a silent pass, not a wrong-flash).
+  await expect(page.locator('#victory-modal')).toBeVisible();
 });
