@@ -3,15 +3,15 @@
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "noEmit": true,
+    "isolatedModules": true,
+    "types": ["vite/client", "vite-plugin-pwa/client"]
   },
   "include": ["src"]
 }

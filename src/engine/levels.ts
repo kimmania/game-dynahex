@@ -48,11 +48,9 @@ export function createGameState(level: LevelDef): GameState {
     originalR: def.r,
   }));
 
-  // Do NOT call recomputeClues here — the clue counts from the level JSON
-  // are the target values (how many neighbors SHOULD be marked).
-  // recomputeClues counts currently-marked neighbors, which is 0 at start.
-  // It should only be called after drift events to recalculate targets
-  // based on the new topology.
+  // Note: clue counts come from the level JSON verbatim (the puzzle's
+  // target constraint). They are only recomputed by the drift engine
+  // (inside applyDrift) once the topology changes.
 
   return {
     levelId: level.id,

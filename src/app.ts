@@ -4,9 +4,8 @@
 
 import { LevelDef, GameState, CellState, LevelScores, SaveData, FIRST_LEVEL_ID } from './engine/types';
 import { createGameState, loadLevels, cloneState } from './engine/levels';
-import { recomputeClues, allResolved, solutionValid, isCompromised, computeScores } from './engine/validator';
-import { computeDrift, applyDrift, buildCellMap } from './engine/drift';
-import { getNeighbors, hexKey } from './engine/hexgrid';
+import { allResolved, solutionValid, isCompromised, computeScores } from './engine/validator';
+import { computeDrift, applyDrift } from './engine/drift';
 import { loadSave, unlockLevel, markLevelComplete, setHelpSeen, updateSettings } from './engine/storage';
 import { setSoundEnabled, playMark, playClear, playAnchor, playDrift, playInvalid, playWin } from './engine/audio';
 import { BoardRenderer, ToolMode } from './ui/board';
@@ -41,6 +40,17 @@ export class App {
     this.bindControls();
     this.renderMap();
     this.showMap();
+
+    // Test seam: only active with ?test=1 — lets the Playwright smoke test
+    // exercise internal flows (wrong-solution flash, state inspection) without
+    // touching real gameplay. No-op in normal play.
+    if (new URLSearchParams(location.search).get('test') === '1') {
+      (window as any).__dynahex = {
+        forceWrongSolution: () => this.showWrongSolution(),
+        getState: () => this.state,
+        getCurrentLevel: () => this.currentLevel,
+      };
+    }
 
     // Show help on first visit
     if (!this.save.hasSeenHelp) {
@@ -148,7 +158,15 @@ export class App {
     return this.save.unlocked.includes(levelId);
   }
 
+  private cancelPendingDrift() {
+    if (this.driftTimeout !== null) {
+      clearTimeout(this.driftTimeout);
+      this.driftTimeout = null;
+    }
+  }
+
   private showMap() {
+    this.cancelPendingDrift();
     this.els['map-view'].style.display = '';
     this.els['game-view'].style.display = 'none';
     this.els['back-btn'].style.display = 'none';
@@ -168,6 +186,7 @@ export class App {
   // ============================================================
 
   private startLevel(levelId: string) {
+    this.cancelPendingDrift();
     const level = this.levels.find((l) => l.id === levelId);
     if (!level) return;
     this.currentLevel = level;
@@ -272,9 +291,6 @@ export class App {
     this.postMove();
   }
 
-  // Called after long-press in mark mode → switch to anchor action
-  // (the renderer's onTap still fires, but we check tool state)
-
   private postMove() {
     if (!this.state || !this.currentLevel) return;
 
@@ -305,10 +321,18 @@ export class App {
     this.refresh();
   }
 
+  private driftTimeout: number | null = null;
+
   private triggerDrift() {
     if (!this.state || !this.currentLevel) return;
+    if (this.driftTimeout !== null) {
+      // A drift is already pending — don't stack them.
+      return;
+    }
 
-    const moves = computeDrift(this.state, this.currentLevel.gridRadius, this.currentLevel.driftSeed);
+    const state = this.state;
+    const level = this.currentLevel;
+    const moves = computeDrift(state, level.gridRadius, level.driftSeed, level.driftVariant);
     if (moves.length === 0) return;
 
     // Animate drift
@@ -316,18 +340,24 @@ export class App {
       this.renderer.animateDrift(moves);
     }
 
-    // Apply drift after animation duration
+    // Apply drift after animation duration. Capture `state`/`level` here so a
+    // pending timeout can't mutate a *different* level's state if the player
+    // navigates (Back/Next) during the 300ms window.
     const duration = this.save.settings.reducedMotion ? 0 : 300;
-    setTimeout(() => {
-      const result = applyDrift(this.state!, moves);
-      if (result.staleCreated) {
-        this.state!.everStale = true;
+    this.driftTimeout = window.setTimeout(() => {
+      this.driftTimeout = null;
+      if (state !== this.state || level !== this.currentLevel) {
+        // Level changed before the drift applied — discard this stale tick.
+        return;
       }
-      recomputeClues(this.state!.cells);
+      const result = applyDrift(state, moves);
+      if (result.staleCreated) {
+        state.everStale = true;
+      }
       playDrift();
 
       // Check for compromise after drift
-      if (isCompromised(this.state!.cells, this.currentLevel!.gridRadius)) {
+      if (isCompromised(state.cells, level.lossTolerance, state.cellsLost)) {
         this.handleCompromised();
       }
 
@@ -357,39 +387,28 @@ export class App {
 
   private showWrongSolution() {
     if (!this.state) return;
-    // Find clues whose count doesn't match their marked neighbors
-    const cellMap = buildCellMap(this.state.cells);
-    const unsatisfiedClues: { q: number; r: number }[] = [];
-
+    // The board is fully resolved but at least one cell's resolution is wrong
+    // (doesn't match isTrue). Flash every such cell red on the canvas.
+    const wrongCells: { q: number; r: number }[] = [];
     for (const cell of this.state.cells) {
-      if (cell.type !== 'clue' || !cell.isGiven) continue;
-      const neighbors = getNeighbors(cell.q, cell.r);
-      let markedCount = 0;
-      for (const { q, r } of neighbors) {
-        const neighbor = cellMap.get(hexKey(q, r));
-        if (neighbor && neighbor.type !== 'clue' && neighbor.resolution === 'marked') {
-          markedCount++;
-        }
-      }
-      if (markedCount !== cell.clueCount) {
-        unsatisfiedClues.push({ q: cell.q, r: cell.r });
+      const expected = cell.isTrue ? 'marked' : 'cleared';
+      if (cell.resolution !== expected) {
+        wrongCells.push({ q: cell.q, r: cell.r });
       }
     }
 
-    if (unsatisfiedClues.length === 0) return;
+    if (wrongCells.length === 0) return;
 
     playInvalid();
 
-    // Flash unsatisfied clues red on the canvas
     if (this.renderer) {
-      this.renderer.flashWrongCells(unsatisfiedClues);
+      this.renderer.flashWrongCells(wrongCells);
     }
 
-    // Show a brief toast message
     this.showToast(
-      unsatisfiedClues.length === 1
-        ? '1 clue is not satisfied — check your marks'
-        : `${unsatisfiedClues.length} clues are not satisfied — check your marks`,
+      wrongCells.length === 1
+        ? '1 cell is resolved wrong — check your marks'
+        : `${wrongCells.length} cells are resolved wrong — check your marks`,
     );
   }
 
@@ -420,7 +439,6 @@ export class App {
       this.state,
       this.currentLevel,
       this.currentLevel.driftSeed,
-      this.currentLevel.gridRadius,
     );
 
     // Save progress

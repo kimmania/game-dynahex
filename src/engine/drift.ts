@@ -2,7 +2,7 @@
 // Drift Engine — deterministic cell migration
 // ============================================================
 
-import { CellState, GameState } from './types';
+import { CellState, GameState, DriftVariant } from './types';
 import { getNeighbors, hexKey } from './hexgrid';
 import { makeRng, shuffle } from './prng';
 
@@ -55,10 +55,16 @@ export function computeDrift(
   state: GameState,
   gridRadius: number,
   driftSeed: string,
+  driftVariant: 'glacial' | 'tidal' | 'storm' | 'quake',
 ): DriftMove[] {
   const cells = state.cells;
   const cellMap = buildCellMap(cells);
   const rng = makeRng(`${driftSeed}-tick${state.driftCount}`);
+
+  // Only the hardest variants (storm, quake) actually allow a cell to drift
+  // off the board edge and be lost. On glacial/tidal the board is "contained":
+  // a cell whose only open neighbor is off-board simply stays put.
+  const shedOffBoard = driftVariant === 'storm' || driftVariant === 'quake';
 
   // Get eligible cells (unknown, unanchored, have unoccupied neighbor)
   const eligible = getDriftEligible(cells);
@@ -87,6 +93,7 @@ export function computeDrift(
       if (claimedKeys.has(key)) continue;
       if (cellMap.has(key)) continue; // currently occupied
       const offBoard = isOffBoard(q, r, gridRadius);
+      if (offBoard && !shedOffBoard) continue; // contained variant: skip off-board
       availableTargets.push({ q, r, offBoard });
     }
 
@@ -204,6 +211,7 @@ export function previewDrift(
   state: GameState,
   gridRadius: number,
   driftSeed: string,
+  driftVariant: DriftVariant,
 ): DriftMove[] {
-  return computeDrift(state, gridRadius, driftSeed);
+  return computeDrift(state, gridRadius, driftSeed, driftVariant);
 }

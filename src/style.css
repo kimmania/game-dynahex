@@ -178,9 +178,6 @@ html, body {
 
 .map-level:active {
   transform: scale(0.97);
-}
-
-.map-level:active {
   border-color: var(--accent);
 }
 
@@ -529,19 +526,6 @@ html, body {
 /* Help content */
 .help-content {
   font-size: 14px;
-}
-
-.cell-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.cell-legend li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .demo-cell {

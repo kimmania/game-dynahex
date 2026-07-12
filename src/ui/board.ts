@@ -36,8 +36,6 @@ export class BoardRenderer {
   // Touch state
   private twoFingerHold = false;
   private touchCount = 0;
-  private longPressTimer: number | null = null;
-  private longPressFired = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -63,7 +61,7 @@ export class BoardRenderer {
   setTool(tool: ToolMode) {
     this.tool = tool;
     if (tool === 'foresight') {
-      this.foresightMoves = previewDrift(this.state, this.gridRadius, this.level.driftSeed);
+      this.foresightMoves = previewDrift(this.state, this.gridRadius, this.level.driftSeed, this.level.driftVariant);
     } else {
       this.foresightMoves = null;
     }
@@ -73,7 +71,7 @@ export class BoardRenderer {
   setState(state: GameState) {
     this.state = state;
     if (this.tool === 'foresight') {
-      this.foresightMoves = previewDrift(this.state, this.gridRadius, this.level.driftSeed);
+      this.foresightMoves = previewDrift(this.state, this.gridRadius, this.level.driftSeed, this.level.driftVariant);
     }
     this.render();
   }
@@ -178,7 +176,6 @@ export class BoardRenderer {
   private handlePointerDown(e: PointerEvent) {
     e.preventDefault();
     this.touchCount++;
-    this.longPressFired = false;
 
     // Two-finger hold for foresight (mobile)
     if (this.touchCount >= 2) {
@@ -190,37 +187,21 @@ export class BoardRenderer {
     }
   }
 
-  private handlePointerMove(e: PointerEvent) {
-    if (this.longPressTimer !== null) {
-      // Cancel long press if moved
-      clearTimeout(this.longPressTimer);
-      this.longPressTimer = null;
-    }
+  private handlePointerMove(_e: PointerEvent) {
+    // pointermove intentionally unused — no drag/long-press behavior.
   }
 
   private handlePointerUp(e: PointerEvent) {
     e.preventDefault();
     this.touchCount = Math.max(0, this.touchCount - 1);
 
-    if (this.longPressTimer !== null) {
-      clearTimeout(this.longPressTimer);
-      this.longPressTimer = null;
-    }
-
     if (this.twoFingerHold) {
       if (this.touchCount === 0) {
         this.twoFingerHold = false;
         // Exit foresight mode if we entered it via two-finger hold
-        // (only if the tool button wasn't already set to foresight)
-        // We'll let the tool button handle toggling; here just go back to mark
         this.setTool('mark');
       }
       return;
-    }
-
-    if (this.longPressFired) {
-      this.longPressFired = false;
-      return; // Long press already handled
     }
 
     // Normal tap
@@ -237,10 +218,6 @@ export class BoardRenderer {
   private handlePointerCancel() {
     this.touchCount = 0;
     this.twoFingerHold = false;
-    if (this.longPressTimer !== null) {
-      clearTimeout(this.longPressTimer);
-      this.longPressTimer = null;
-    }
   }
 
   // ============================================================
@@ -298,12 +275,12 @@ export class BoardRenderer {
         const toScreen = this.toScreen(move.toQ, move.toR);
         const x = fromScreen.x + (toScreen.x - fromScreen.x) * easeProgress;
         const y = fromScreen.y + (toScreen.y - fromScreen.y) * easeProgress;
-        this.drawHexAt(x, y, cell, i);
+        this.drawHexAt(x, y, cell);
         continue;
       }
 
       const screen = this.toScreen(renderQ, renderR);
-      this.drawHexAt(screen.x, screen.y, cell, i);
+      this.drawHexAt(screen.x, screen.y, cell);
     }
 
     // Draw foresight preview
@@ -333,7 +310,7 @@ export class BoardRenderer {
     ctx.strokeRect(2 * this.dpr, 2 * this.dpr, w - 4 * this.dpr, this.canvas.height - 4 * this.dpr);
   }
 
-  private drawHexAt(cx: number, cy: number, cell: CellState, index: number) {
+  private drawHexAt(cx: number, cy: number, cell: CellState) {
     const ctx = this.ctx;
     const size = this.hexSize * this.zoom * this.dpr;
 

@@ -178,9 +178,13 @@ VOLUME_NAMES = {
 
 def generate_volume(volume_id: str, volume_label: str, grid_radius: int,
                      drift_frequency: int, drift_variant: str, anchor_budget_fn,
-                     loss_tolerance: int, par_time_fn, num_levels: int,
+                     loss_tolerance_fn, par_time_fn, num_levels: int,
                      seed_offset: int) -> List[dict]:
-    """Generate all levels for a volume."""
+    """
+    Generate all levels for a volume.
+    `loss_tolerance_fn(i, grid_radius)` returns the per-level loss tolerance so
+    harder late levels can be tightened while early levels are forgiving.
+    """
     levels = []
     names = VOLUME_NAMES.get(volume_id, [f"Level {i+1}" for i in range(num_levels)])
 
@@ -190,6 +194,7 @@ def generate_volume(volume_id: str, volume_label: str, grid_radius: int,
         rng = random.Random(f"dynahex-{volume_id}-{i}")
         drift_seed = hashlib.md5(f"{volume_id}-{i:02d}".encode()).hexdigest()[:6]
         anchor_budget = anchor_budget_fn(i, grid_radius)
+        loss_tolerance = loss_tolerance_fn(i, grid_radius)
         par_time = par_time_fn(grid_radius)
 
         level = generate_level(
@@ -222,7 +227,7 @@ def main():
         "v1", "The Drift Awakens",
         grid_radius=2, drift_frequency=99, drift_variant="glacial",
         anchor_budget_fn=lambda i, r: max(3, 8 - i),  # 8 down to 3
-        loss_tolerance=0,
+        loss_tolerance_fn=lambda i, r: 0,  # glacial is contained — never sheds
         par_time_fn=lambda r: 120,
         num_levels=10,
         seed_offset=0,
@@ -240,29 +245,33 @@ def main():
         "v2", "Tidal Zones",
         grid_radius=3, drift_frequency=5, drift_variant="tidal",
         anchor_budget_fn=lambda i, r: max(2, 4 - i // 5),
-        loss_tolerance=0,
+        loss_tolerance_fn=lambda i, r: 0,  # tidal is contained — never sheds
         par_time_fn=lambda r: 180,
         num_levels=14,
         seed_offset=100,
     )
 
-    # Volume III: Storm Fronts — 61 cells (radius 4), storm (3)
+    # Volume III: Storm Fronts — 61 cells (radius 4), storm (3).
+    # Storm ALLOWS off-board shed, so loss tolerance is now the gate. Early
+    # levels are forgiving (tolerate up to 4 losses); the finale demands
+    # near-perfect play (tolerance 1).
     v3 = generate_volume(
         "v3", "Storm Fronts",
         grid_radius=4, drift_frequency=3, drift_variant="storm",
         anchor_budget_fn=lambda i, r: max(2, 5 - i // 4),
-        loss_tolerance=0,
+        loss_tolerance_fn=lambda i, r: max(1, 4 - i // 3),  # 4 -> 1 across the volume
         par_time_fn=lambda r: 300,
         num_levels=12,
         seed_offset=200,
     )
 
-    # Volume IV: The Collapse — 91 cells (radius 5), quake (2), anchor famine
+    # Volume IV: The Collapse — 91 cells (radius 5), quake (2), anchor famine.
+    # Quake is the harshest shed variant; tolerance tapers 3 -> 1.
     v4 = generate_volume(
         "v4", "The Collapse",
         grid_radius=5, drift_frequency=2, drift_variant="quake",
         anchor_budget_fn=lambda i, r: max(1, 3 - i // 4),
-        loss_tolerance=0,
+        loss_tolerance_fn=lambda i, r: max(1, 3 - i // 4),  # 3 -> 1 across the volume
         par_time_fn=lambda r: 420,
         num_levels=10,
         seed_offset=300,
