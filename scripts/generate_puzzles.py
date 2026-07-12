@@ -48,24 +48,30 @@ def hex_distance(q1: int, r1: int, q2: int, r2: int) -> int:
 
 
 def generate_solution(coords: List[Tuple[int, int]], rng: random.Random, density: float = 0.5) -> Dict[Tuple[int, int], bool]:
-    """Generate a random solution (which cells are true vs false)."""
+    """Generate a random solution (which cells are true vs false).
+
+    We target a BALANCED board: roughly half true, half false. An unbalanced
+    solution (almost-all-true) produces a tedious "mark everything" puzzle with
+    no clears, which is exactly what we must avoid. The clamp keeps the true
+    fraction within 40-60%.
+    """
     solution = {}
     for coord in coords:
         solution[coord] = rng.random() < density
-    # Ensure at least 20% and at most 80% are true
+    # Ensure at least 35% and at most 55% are true (balanced marks/clears,
+    # biased lower so enough SAFE cells remain to be used as CLUEs without
+    # consuming every clear-unknown).
     true_count = sum(1 for v in solution.values() if v)
     total = len(coords)
-    if true_count < total * 0.2:
-        # Add some trues
+    if true_count < total * 0.35:
         falses = [c for c, v in solution.items() if not v]
         rng.shuffle(falses)
-        for c in falses[:int(total * 0.2) - true_count]:
+        for c in falses[:int(total * 0.35) - true_count]:
             solution[c] = True
-    elif true_count > total * 0.8:
-        # Remove some trues
+    elif true_count > total * 0.55:
         trues = [c for c, v in solution.items() if v]
         rng.shuffle(trues)
-        for c in trues[:true_count - int(total * 0.8)]:
+        for c in trues[:true_count - int(total * 0.55)]:
             solution[c] = False
     return solution
 
@@ -194,23 +200,29 @@ def generate_level(level_id: str, name: str, volume: str, volume_label: str,
     """
     coords = hex_grid_coords(grid_radius)
     coord_set = set(coords)
-    max_clues = int(len(coords) * 0.7)  # bound clue growth; keep it a puzzle
+    # Clues MUST come from SAFE cells, so a sparser solution (more safe cells
+    # available) lets us reach uniqueness WITHOUT converting every safe cell
+    # into a clue -- preserving a real mark/clear mix for the player. We
+    # target ~40% true (clamp 35-55%); the larger boards otherwise need
+    # near-all-safe-as-clues to be unique, which kills the clears.
+    max_clues = max(3, int(len(coords) * 0.55))
+    min_clears_frac = 0.18  # of unknown (non-clue) cells must be clears
 
     best = None
-    for attempt in range(400):
+    for attempt in range(800):
         rng = random.Random(f"{drift_seed}:sol:{attempt}")
-        solution = generate_solution(coords, rng, density=0.45 + rng.random() * 0.15)
+        solution = generate_solution(coords, rng, density=0.38 + rng.random() * 0.06)
 
-        # Sparse initial clue set drawn from SAFE cells only.
+        # Sparse INITIAL clue set drawn from SAFE cells only (~12% of board).
         safe_cells = [c for c in coords if not solution.get(c, False)]
         rng.shuffle(safe_cells)
-        initial_clues = max(1, int(len(coords) * max(0.25, 0.5 - grid_radius * 0.03)))
+        initial_clues = max(1, int(len(coords) * 0.12))
         clue_cells: Set[Tuple[int, int]] = set(
             c for c in safe_cells[:initial_clues] if not solution.get(c, False))
 
         clue_cells, clue_counts = place_clues(coords, solution, rng, clue_cells)
 
-        # Grow clues (add safe unknowns) until unique or we run out of room.
+        # Grow clues (add safe unknowns) until unique or we hit the cap.
         grow = 0
         while count_solutions(coords, clue_cells, clue_counts) != 1:
             pool = [c for c in safe_cells if c not in clue_cells]
@@ -225,15 +237,30 @@ def generate_level(level_id: str, name: str, volume: str, volume_label: str,
                 break
 
         n = count_solutions(coords, clue_cells, clue_counts)
-        if n == 1:
-            best = (solution, clue_cells, clue_counts)
-            break
-        # n > 1 (ambiguous) or 0 (over-clued contradiction) -> try next seed.
+        if n != 1:
+            continue  # ambiguous or over-clued -> try next seed
+        # Enforce balance: enough CLEAR unknowns must remain.
+        unknown = [c for c in coords if c not in clue_cells]
+        clear_unknowns = sum(1 for c in unknown if not solution.get(c, False))
+        if unknown and clear_unknowns < len(unknown) * min_clears_frac:
+            continue  # solution too mark-heavy after uniqueness -> reroll
+        best = (solution, clue_cells, clue_counts)
+        break
+
+    if best is None:
+        # Should be unreachable; fall back to a fresh solution + modest clues.
+        rng = random.Random(f"{drift_seed}:fallback")
+        solution = generate_solution(coords, rng, density=0.4)
+        safe_cells = [c for c in coords if not solution.get(c, False)]
+        rng.shuffle(safe_cells)
+        clue_cells = set(c for c in safe_cells[:max_clues] if not solution.get(c, False))
+        clue_cells, clue_counts = place_clues(coords, solution, rng, clue_cells)
+        best = (solution, clue_cells, clue_counts)
 
     if best is None:
         # Should be unreachable; fall back to a fresh solution + max clues.
         rng = random.Random(f"{drift_seed}:fallback")
-        solution = generate_solution(coords, rng, density=0.5)
+        solution = generate_solution(coords, rng, density=0.4)
         safe_cells = [c for c in coords if not solution.get(c, False)]
         clue_cells = set(c for c in safe_cells if not solution.get(c, False))
         clue_cells, clue_counts = place_clues(coords, solution, rng, clue_cells)
